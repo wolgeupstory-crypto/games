@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>K-직장인: 퇴사까지 180일</title>
+<style>
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Noto Sans KR",sans-serif;color:#171717;background:#f4f4f2}*{box-sizing:border-box}body{margin:0;background:#f4f4f2}.app{width:min(100%,560px);margin:auto;padding:18px 16px 28px}.top{display:flex;justify-content:space-between;align-items:flex-start}.eyebrow{font-size:13px;color:#777}.top h1{font-size:23px;margin:2px 0 15px}.ghost,.secondary,.primary,.choice{font:inherit;border-radius:11px;padding:12px;border:1px solid #ddd;background:#fff}.ghost{padding:8px 10px;font-size:12px;color:#666}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}.stat{background:#fff;border:1px solid #e7e7e4;border-radius:12px;padding:10px 12px}.stat span{display:block;font-size:12px;color:#777;margin-bottom:4px}.dots{letter-spacing:1px;font-size:14px}.card{background:#fff;border:1px solid #e4e4e1;border-radius:16px;padding:20px}.hidden{display:none!important}.meta{font-size:12px;color:#888;margin-bottom:8px}.card h2{font-size:21px;margin:0 0 12px;line-height:1.35}.card p{white-space:pre-line;line-height:1.7;margin:0 0 18px}.choices{display:grid;gap:9px}.choice{text-align:left;cursor:pointer;background:#fafafa}.choice:hover{background:#f2f2f2}.effects{margin:10px 0 16px;font-size:13px}.effect{margin-right:8px}.good{color:#167245}.bad{color:#b02a37}.primary{width:100%;background:#171717;color:#fff;border-color:#171717;cursor:pointer}.secondary{width:100%;margin-top:8px;cursor:pointer}.ending-actions{margin-top:18px}.final-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0}.final-stats div{background:#f6f6f4;border-radius:10px;padding:10px;text-align:center}.final-stats small{display:block;color:#777}.final-stats strong{font-size:20px}.trait{padding:12px;background:#f6f6f4;border-radius:10px;line-height:1.6}.trait strong{display:block;margin-bottom:3px}footer{text-align:center;color:#999;font-size:11px;margin-top:18px}.special{font-weight:700;color:#795b00}
+</style></head><body><main class="app">
+<header class="top"><div><div class="eyebrow">K-직장인</div><h1><span id="day">D-180</span></h1></div><button id="restart" class="ghost">처음부터</button></header>
+<section class="stats"><div class="stat"><span>돈</span><div id="money" class="dots"></div></div><div class="stat"><span>멘탈</span><div id="mental" class="dots"></div></div><div class="stat"><span>평판</span><div id="reputation" class="dots"></div></div></section>
+<section id="eventCard" class="card"><div id="meta" class="meta"></div><h2 id="title"></h2><p id="text"></p><div id="choices" class="choices"></div></section>
+<section id="resultCard" class="card hidden"><div class="meta">결과</div><h2 id="resultTitle"></h2><p id="resultText"></p><div id="effects" class="effects"></div><button id="next" class="primary">다음</button></section>
+<section id="endingCard" class="card hidden"><div class="meta" id="endingMeta">FINAL</div><h2 id="endingTitle"></h2><p id="endingText"></p><div id="finalStats" class="final-stats"></div><div id="trait" class="trait"></div><div class="ending-actions"><button id="again" class="primary">다시 플레이</button><button id="share" class="secondary">결과 공유하기</button></div></section>
+<footer>K-직장인 · 180일 버전</footer></main>
+<script>
+const MAX_DAY=180;
+const E={
+ C01:{type:'company',title:'금요일 5:47',text:'금요일 오후 5시 47분. 거래처에서 연락이 왔다.\n\n"월요일 오전까지 가능할까요?"',duration:3,max:1,choices:[['가능하다고 한다',{mental:-1,reputation:1},'reputation'],['월요일은 어렵다고 한다',{},'mental'],['"금요일인데요?"',{mental:1,reputation:-1},'mental']]},
+ C02:{type:'company',title:'갑작스러운 회식',text:'퇴근하려는데 팀장이 말했다.\n\n"오늘 간단하게 한잔하고 갈까?"',duration:2,max:2,choices:[['간다',{mental:-1,reputation:1},'reputation'],['먼저 들어간다',{},'mental']]},
+ C03:{type:'company',title:'동료가 업무를 부탁했다',text:'동료가 조심스럽게 말을 걸었다.\n\n"이것만 좀 도와줄 수 있어?"',duration:2,max:2,choices:[['도와준다',{mental:-1,reputation:1},'reputation', 'helped'],['오늘은 내 일부터 처리한다',{},'mental']]},
+ C04:{type:'company',title:'팀장 휴가',text:'팀장이 며칠간 자리를 비운다. 이번 주는 어떻게 흘러갈까?',duration:4,max:1,random:'boss'},
+ C05:{type:'company',title:'남은 연차',text:'연차가 하나 남았다. 어떻게 할까?',duration:1,max:1,choices:[['사용한다',{mental:1},'mental'],['연차수당으로 받는다',{money:1},'money']]},
+ C06:{type:'company',title:'중요한 업무',text:'갑자기 중요한 업무 하나를 맡게 됐다. 잘하면 꽤 눈에 띌 것 같다.',duration:3,max:1,choices:[['제대로 한다',{mental:-1,reputation:1},'reputation'],['적당히 처리한다',{},'mental']]},
+ C07:{type:'company',title:'자료에서 오류 발견',text:'제출 직전, 자료에서 작은 오류 하나를 발견했다. 다행히 지금 고치면 된다.',duration:2,max:1,random:'error'},
+ C08:{type:'company',title:'갑작스러운 회의',text:'갑자기 회의에 참석해달라는 연락을 받았다.\n무슨 얘기가 나올지는 아직 모른다.',duration:2,max:1,choices:[['회의에 참석한다',{},'mental']],random:'meeting'},
+ C09:{type:'company',title:'피하고 싶은 사람',text:'회사에서 마주치면 괜히 피곤한 사람이 있다.\n오늘도 멀리서 보인다.',duration:1,max:1,random:'avoid'},
+ C10:{type:'company',title:'점심 메뉴',text:'점심시간. 동료들이 메뉴를 고르고 있다. 다들 먹고 싶은 게 조금씩 다르다.',duration:1,max:2,choices:[['내가 먹고 싶은 걸 말한다',{},'mental','lunch'],['다른 사람이 고른 걸 따른다',{},'mental']]},
+ C11:{type:'company',title:'갑작스러운 업무 폭증',text:'오후가 되자 갑자기 일이 몰려왔다. 오늘 안에 어느 정도 정리해야 할 것 같다.',duration:2,max:2,choices:[['야근해서 끝낸다',{mental:-1,reputation:1},'reputation'],['오늘 할 만큼만 하고 퇴근한다',{},'mental']]},
+ C12:{type:'company',title:'동료의 작은 실수',text:'동료가 업무에서 작은 실수를 했다. 아직 본인은 눈치채지 못한 것 같다.',duration:2,max:1,choices:[['알려준다',{reputation:1},'reputation'],['일단 지켜본다',{},'mental']]},
+ C13:{type:'company',title:'업무 방향 변경',text:'거의 다 해놓은 업무의 방향이 갑자기 바뀌었다. 지금까지 한 작업을 상당 부분 다시 해야 한다.',duration:3,max:1,choices:[['다시 한다',{mental:-1,reputation:1},'reputation'],['일단 오늘은 여기까지 한다',{},'mental']]},
+ C14:{type:'company',title:'동료가 내 성과를 가로챔',text:'회의에서 동료가 내가 한 일을 자기 성과처럼 이야기하고 있다.',duration:2,max:1,choices:[['바로 이야기한다',{reputation:1,mental:-1},'reputation'],['그냥 넘어간다',{mental:-1},'mental'],['자료를 꺼내 차분하게 설명한다',{reputation:1,mental:1},'reputation','reqMental4']]},
+ C15:{type:'company',title:'팀장이 일찍 퇴근했다',text:'오늘 팀장이 평소보다 일찍 퇴근했다.',duration:1,max:2,choices:[['나도 퇴근한다',{mental:1},'mental'],['조금 더 정리하고 간다',{reputation:1,mental:-1},'reputation']]},
+ C16:{type:'company',title:'업무 결과를 인정받았다',text:'회의가 끝난 뒤 팀장이 당신이 처리한 부분을 따로 언급했다.',duration:1,max:1,auto:{reputation:1}},
+ C17:{type:'company',title:'커피 한 잔',text:'며칠 뒤 그 동료가 커피를 하나 건넨다.',duration:1,max:1,condition:s=>s.flags.helped&&!s.flags.coffee&&!s.flags.coffeeDone,auto:{mental:1},after:s=>{s.flags.coffee=true;s.flags.coffeeDone=true}},
+ C18:{type:'company',title:'일이 예상보다 빨리 끝났다',text:'오늘 할 일이 생각보다 빨리 끝났다. 오랜만에 퇴근 전 시간이 조금 남았다.',duration:1,max:2,choices:[['바로 퇴근 준비',{mental:1},'mental'],['내일 할 일을 미리 정리한다',{reputation:1},'reputation']]},
+ O01:{type:'outside',title:'퇴근길 충동구매',text:'퇴근길에 예전부터 사고 싶었던 물건이 할인 중이다.',duration:1,max:2,choices:[['산다',{money:-1,mental:1},'money'],['그냥 지나친다',{},'money']]},
+ O02:{type:'outside',title:'갑작스러운 여행 제안',text:'친구가 이번 주말에 갑자기 여행을 가자고 한다.',duration:3,max:1,choices:[['간다',{money:-1,mental:1},'mental'],['다음에 가기로 한다',{},'money']]},
+ O03:{type:'outside',title:'주말에 집에서 쉼',text:'이번 주말에는 아무 약속도 없다. 그냥 집에서 푹 쉬었다.',duration:2,max:2,auto:{}},
+ O04:{type:'outside',title:'휴대폰 고장',text:'잘 쓰던 휴대폰이 갑자기 이상해졌다. 수리비가 생각보다 많이 나온다.',duration:2,max:1,auto:{money:-1}},
+ O05:{type:'outside',title:'오랜만에 친구 만남',text:'오랜만에 친구를 만나기로 했다.',duration:2,max:2,choices:[['만나서 한참 얘기한다',{mental:1},'mental'],['피곤해서 다음으로 미룬다',{},'mental']]},
+ O06:{type:'outside',title:'새로운 취미',text:'요즘 새로운 취미를 하나 시작해볼까 싶다.',duration:2,max:1,choices:[['헬스를 시작한다',{money:-1,mental:1},'mental','hobbyStart'],['그냥 생각만 한다',{},'mental']]},
+ O07:{type:'outside',title:'약속 취소',text:'주말에 잡혀 있던 약속이 갑자기 취소됐다.',duration:1,max:2,choices:[['그냥 쉰다',{mental:1},'mental'],['혼자 다른 약속을 잡는다',{money:-1,mental:1},'mental']]},
+ O08:{type:'outside',title:'분식집',text:'집에 가는 길에 분식집에 들렀다.\n그런데 사장님이 오늘 남은 음식을 많이 챙겨주셨다.\n\n"이거 그냥 가져가."',duration:1,max:1,random:'snack'},
+ O09:{type:'outside',title:'오랫동안 못 본 친구',text:'정말 오랫동안 못 봤던 친구를 길에서 우연히 만났다.',duration:1,max:1,random:'oldfriend'},
+ O10:{type:'outside',title:'날씨 좋은 날 산책',text:'날씨가 유난히 좋은 날이었다.\n평소보다 조금 오래 걸었다.',duration:1,max:2,auto:{}},
+ O11:{type:'outside',title:'배달 음식',text:'오늘은 요리하기가 너무 귀찮다.',duration:1,max:2,choices:[['배달시킨다',{money:-1,mental:1},'money'],['대충 집에서 먹는다',{},'mental']]},
+ O12:{type:'outside',title:'갑자기 비',text:'우산이 없다. 하필 오늘 비가 온다.',duration:1,max:2,choices:[['편의점에서 우산 산다',{money:-1},'money'],['그냥 맞고 간다',{mental:-1},'mental']]},
+ O13:{type:'outside',title:'약국',text:'퇴근길에 약국에 들렀다. 생각보다 필요한 게 많았다.',duration:1,max:1,auto:{money:-1}},
+ O14:{type:'outside',title:'중고거래',text:'안 쓰는 물건 하나를 발견했다. 중고거래 앱에 올렸더니 생각보다 빨리 팔렸다.',duration:3,max:1,auto:{money:1}},
+ O15:{type:'outside',title:'친구가 밥 사줌',text:'오랜만에 만난 친구가 오늘은 자기가 산다고 한다.',duration:2,max:1,auto:{money:1,mental:1}},
+ O16:{type:'outside',title:'갑작스러운 경조사',text:'오랜만에 연락 온 지인의 결혼 소식이다.',duration:2,max:1,auto:{money:-1}},
+ O17:{type:'outside',title:'로또 구매',text:'퇴근길에 로또 판매점이 보인다.',duration:1,max:1,choices:[['한 장 산다',{money:-1},'money','lotto'],['그냥 지나간다',{},'money']]},
+ O18:{type:'outside',title:'길냥이',text:'산책하다가 길냥이를 만났다.',duration:1,max:2,random:'cat'},
+ O19:{type:'outside',title:'타코야끼 트럭',text:'산책하다가 타코야끼 트럭을 발견했다.',duration:1,max:2,choices:[['사 먹는다',{money:-1,mental:1},'mental'],['그냥 지나친다',{},'money']]},
+ C19:{type:'company',title:'일정이 앞당겨졌다',text:'예정보다 일정이 조금 앞당겨졌다.\n다행히 오늘은 여유가 생겼다.',duration:2,max:1,choices:[['미리 정리해둔다',{reputation:1},'reputation'],['오늘은 일찍 퇴근한다',{mental:1},'mental']]},
+ C20:{type:'company',title:'업무 인수인계',text:'옆자리 동료가 자리를 비우게 됐다.\n간단한 업무 몇 가지를 인수인계받았다.',duration:3,max:1,choices:[['꼼꼼하게 확인한다',{reputation:1,mental:-1},'reputation'],['필요한 것만 확인한다',{},'mental']]},
+ C21:{type:'company',title:'회의가 일찍 끝났다',text:'예상보다 회의가 빨리 끝났다.\n생각보다 시간이 많이 남았다.',duration:1,max:1,choices:[['남은 일을 조금 정리한다',{reputation:1},'reputation'],['바로 퇴근 준비를 한다',{mental:1},'mental']]},
+ C22:{type:'company',title:'동료에게 도움받음',text:'막히던 업무를 동료가 한 번에 해결해줬다.',duration:2,max:1,choices:[['고맙다고 말한다',{},'mental'],['다음에 내가 돕기로 한다',{reputation:1},'reputation']]},
+ O20:{type:'outside',title:'결제 취소 환급',text:'며칠 전 결제했던 물건 하나가 취소됐다.\n생각보다 빨리 환급금이 들어왔다.',duration:2,max:1,auto:{money:1}},
+ O21:{type:'outside',title:'예전에 빌려준 돈',text:'예전에 친구에게 빌려줬던 돈을 돌려받았다.\n까맣게 잊고 있었다.',duration:2,max:1,auto:{money:1}},
+ O22:{type:'outside',title:'카드 캐시백',text:'카드 앱을 확인하다가 쌓여 있던 캐시백을 발견했다.',duration:1,max:1,auto:{money:1}},
+ O23:{type:'outside',title:'중고책 정리',text:'책장을 정리하다가 안 읽는 책 몇 권을 발견했다.\n중고로 팔았더니 생각보다 금방 팔렸다.',duration:2,max:1,auto:{money:1}},
+ O24:{type:'outside',title:'친구가 작은 선물을 줌',text:'친구가 별것 아니라며 작은 선물을 하나 건넸다.',duration:1,max:1,auto:{mental:1}},
+ O25:{type:'outside',title:'집에 있던 상품권',text:'서랍을 정리하다가 예전에 받아둔 상품권을 발견했다.',duration:1,max:1,auto:{money:1}}
+};
+const order=Object.keys(E); 
+const MONEY_LOSS_EVENTS=new Set(['O01','O02','O04','O06','O07','O11','O12','O13','O16','O17','O19']);
+
+// Shorten the run by letting each event cover a little more of the 180 days.
+Object.values(E).forEach(e=>{if(e.duration)e.duration=Math.min(8,Math.max(5,Math.round(e.duration*3)));});
+function fresh(){return {day:1,money:3,mental:3,reputation:3,rescueUsed:false,rescuePending:null,rescueResult:false,counts:{},recent:[],eventCount:0,flags:{},pending:[],story:null,storyStage:0,storyCooldown:0,investmentCount:0,investmentSuccess:0,lottoBought:false,traits:{money:0,mental:0,reputation:0},lastMoneyLoss:false,ending:false,current:null};}
+let s=fresh();
+function clamp(v){return Math.max(0,Math.min(5,v));}
+function dots(v){return '●'.repeat(v)+'○'.repeat(5-v);}
+function render(){day.textContent=s.day>=MAX_DAY?'D-DAY':`D-${MAX_DAY-s.day}`;money.textContent=dots(s.money);mental.textContent=dots(s.mental);reputation.textContent=dots(s.reputation);}
+function effText(e){let n={money:'돈',mental:'멘탈',reputation:'평판'};return Object.entries(e||{}).filter(([,v])=>v).map(([k,v])=>`<span class="effect ${v>0?'good':'bad'}">${n[k]} ${v>0?'+':''}${v}</span>`).join(' · ')||'변화 없음';}
+function add(e){for(const[k,v]of Object.entries(e||{}))s[k]=clamp(s[k]+v);}
+function count(id){return s.counts[id]||0;}
+function can(id){let e=E[id];return !e.condition||e.condition(s);}
+function recentFresh(id){return !s.recent.slice(-5).includes(id);}
+function randomOutcome(kind){let r=Math.random();
+ if(kind==='boss')return r<.45?{title:'평화로운 일주일',text:'팀장이 없는 동안 생각보다 일이 조용하게 흘러갔다.',effects:{mental:1}}:r<.8?{title:'일이 몰렸다',text:'팀장이 비운 자리를 메우느라 일이 생각보다 많아졌다.',effects:{mental:-1}}:{title:'일을 잘 처리했다',text:'팀장 없이도 업무를 깔끔하게 정리했다.',effects:{reputation:1}};
+ if(kind==='error')return r<.55?{title:'깔끔하게 수정했다',text:'오류를 바로잡고 제출했다.',effects:{}}:r<.8?{title:'다른 오류도 발견했다',text:'수정하다 보니 다른 오류 하나도 발견했다.',effects:{reputation:1}}:{title:'수정하다 야근했다',text:'생각보다 손이 많이 가서 결국 조금 늦게 퇴근했다.',effects:{mental:-1}};
+ if(kind==='meeting')return r<.55?{title:'무난하게 끝났다',text:'생각보다 별일 없이 회의가 끝났다.',effects:{}}:r<.8?{title:'갑자기 질문을 받았다',text:'예상하지 못한 질문을 받아 조금 당황했다.',effects:{mental:-1}}:{title:'좋은 인상을 남겼다',text:'준비했던 내용을 잘 설명했다.',effects:{reputation:1}};
+ if(kind==='avoid')return r<.88?{title:'무사히 피했다',text:'오늘은 마주치지 않고 넘어갔다.',effects:{}}:{title:'하필 마주쳤다',text:'피하려 했는데 결국 마주쳤다.',effects:{mental:-1}};
+ if(kind==='lunch')return r<.15?{title:'다들 만족했다',text:'신기하게도 다들 그 메뉴를 좋아했다.',effects:{reputation:1}}:{title:'그냥 점심이었다',text:'별일 없이 점심을 먹었다.',effects:{}};
+ if(kind==='cat')return r<.05?{title:'뜻밖의 선물',text:'길냥이가 뭔가를 물고 와서 발밑에 내려놓았다.\n\n야옹아 고마워.',effects:{mental:1,money:1}}:{title:'귀여운 녀석',text:'잠깐 구경했다.\n\n야옹.',effects:{mental:1}};
+ if(kind==='snack')return r<.12?{title:'작은 행운',text:'덕분에 간식값도 아꼈다.',effects:{mental:1,money:1}}:{title:'뜻밖의 간식',text:'생각보다 기분이 좋아졌다.',effects:{mental:1}};
+ if(kind==='oldfriend')return r<.7?{title:'반가운 재회',text:'잠깐 이야기했는데도 기분이 좋아졌다.',effects:{mental:1}}:{title:'아, 맞다. 빌려준 돈',text:'친구가 갑자기 예전에 빌린 돈 이야기를 꺼냈다.',effects:{money:-1}};
+}
+function sideAvailable(){if(s.story||s.storyCooldown>0)return false; if(s.day>=45&&!s.flags.hhClosed&&!s.flags.hhDone&&Math.random()<.035)return true; return false;}
+function startSpecial(){
+ if(s.story||s.storyCooldown>0)return null;
+ const candidates=[];
+ if(s.day>=45&&!s.flags.hhClosed&&!s.flags.hhDone)candidates.push(['headhunter',.035]);
+ if(s.day>=30&&!s.flags.helper&&!s.flags.helperDone)candidates.push(['helper',.04]);
+ if(s.day>=50&&!s.flags.villain&&!s.flags.villainDone)candidates.push(['villain',.03]);
+ if(!candidates.length)return null;
+ const available=candidates.filter(([,p])=>Math.random()<p);
+ if(!available.length)return null;
+ const [story]=available[Math.floor(Math.random()*available.length)];
+ s.story=story;s.storyStage=0;return storyEvent();
+}
+function storyEvent(){if(s.story==='helper')return{id:'HELPER',type:'special',title:'먼저 말을 걸어왔다',text:'최근 들어 자꾸 업무가 꼬인다.\n그런데 옆자리 동료가 먼저 말을 걸어왔다.\n\n"이거 내가 좀 봐줄까?"',duration:2,choices:[['부탁한다',{mental:1},'mental','helperDone']]};
+ if(s.story==='villain')return{id:'VILLAIN',type:'special',title:'새 프로젝트의 그 사람',text:'새 프로젝트에 새로운 사람이 합류했다.\n말도 빠르고 일도 꽤 잘하는 것 같다.\n다만 말투가 조금 거슬린다.',duration:2,choices:[['그냥 같이 일한다',{},'mental'],['최대한 엮이지 않는다',{},'mental']]};
+ if(s.story==='villain_result'){let good=Math.random()<.55; s.story=null;s.flags.villainDone=true;return{id:'VILLAIN_RESULT',type:'special',title:'프로젝트 결과',text:good?'프로젝트가 생각보다 잘 마무리됐다.\n그 사람이 맡은 부분도 깔끔했다.':'마감 직전에 문제가 터졌다.\n결국 당신이 뒤처리를 맡게 됐다.',duration:2,auto:good?{reputation:1}:{mental:-1,reputation:-1}};}
+ if(s.story==='headhunter'){return{id:'HH1',type:'special',title:'헤드헌터에게 연락이 왔다',text:'구직사이트에 올려둔 이력서를 보고 연락이 왔다.\n비슷한 직무의 포지션을 소개해주고 싶다고 한다.',duration:2,choices:[['관심 있다고 한다',{},'reputation','hhAccept'],['괜찮다고 한다',{},'mental','hhClosed']]};}
+ if(s.story==='hh2')return{id:'HH2',type:'special',title:'면접 일정이 잡혔다',text:'며칠 뒤 헤드헌터에게 연락이 왔다.\n회사와 직무에 대한 자세한 설명을 들었다.\n\n면접 일정이 잡혔다.',duration:3,auto:{}};
+ if(s.story==='hh3'){let p=.35+(s.reputation>=4?.25:0)+(s.mental>=4?.2:0);let ok=Math.random()<p;s.story=null;s.flags.hhDone=true;if(ok)return{id:'HH3',type:'special',special:'headhunter',title:'면접 결과',text:'면접 결과가 나왔다.\n\n합격했다.\n\n"이런 사람을 찾고 있었어요."',duration:1,auto:{}};return{id:'HH3F',type:'special',title:'면접 결과',text:'면접 결과가 나왔다.\n\n아쉽게도 이번에는 인연이 아니었다.',duration:1,auto:{}};}
+ return null;}
+function hobbyEvent(){if(s.flags.hobbyDone)return null;return{id:'HOB3',type:'side',title:'운동 루틴이 생겼다',text:'몇 번 빠지지 않고 계속 운동하다 보니, 이제 조금씩 루틴이 생겼다.',duration:3,auto:{mental:1}};}
+function specialCandidate(){
+ if(s.story||s.storyCooldown>0)return null;
+ return startSpecial();
+}
+function pool(){let base=order.filter(id=>{let e=E[id];if(!can(id)||count(id)>=e.max||!recentFresh(id))return false;if(id==='C17'&&!s.flags.helped)return false;if(id==='O17'&&s.lottoBought)return false;if(id==='O06'&&(s.flags.hobbyStarted||s.flags.hobbyDone||s.story==='hobby'))return false;return true;});if(s.lastMoneyLoss){let safe=base.filter(id=>!MONEY_LOSS_EVENTS.has(id));if(safe.length)base=safe;}return base;}
+function pick(){if(s.pending.length){let i=s.pending.findIndex(p=>s.eventCount>=p.at);if(i>=0){let p=s.pending.splice(i,1)[0];return p.event;}}
+ if(s.story && s.storyCooldown>0){s.storyCooldown--;}
+ if(s.story && s.storyCooldown<=0){
+   if(s.story==='hobby'){let h=hobbyEvent();if(h)return h;s.story=null;s.flags.hobbyDone=true;s.storyCooldown=5;}
+   return storyEvent();
+ }
+ let sp=s.story?null:specialCandidate();if(sp)return sp;
+ let ids=pool();if(!ids.length)ids=order.filter(id=>count(id)<E[id].max&&can(id));
+ // company/outside balance
+ let last=s.recent.slice(-2);let companyRecent=last.filter(x=>E[x]?.type==='company').length;let outsideRecent=last.filter(x=>E[x]?.type==='outside').length;
+ if(companyRecent>=2){let out=ids.filter(id=>E[id].type==='outside');if(out.length)ids=out;} else if(outsideRecent>=2){let co=ids.filter(id=>E[id].type==='company');if(co.length)ids=co;}
+ // occasional investment/lotto result handled as pending; investment offered only when money >=3 and cooldown-like max 4
+ if(s.day>=40&&s.money>=3&&s.investmentCount<4&&!s.story&&s.storyCooldown<=0&&Math.random()<.045){return {id:'INV',type:'special',title:'투자해볼까?',text:'요즘 주식이 계속 눈에 들어온다.\n조금 사볼까?',duration:2,choices:[['투자한다',{money:-1},'money','invest'],['하지 않는다',{},'money']]};}
+ let id=ids[Math.floor(Math.random()*ids.length)];return E[id];}
+function rescueNow(stat){if(!s.rescuePending||!s.rescuePending.includes(stat))return;s[stat]=1;s.rescuePending=s.rescuePending.filter(k=>k!==stat);if(s.rescuePending.length){show();return;}s.rescueResult=true;s.current=null;eventCard.classList.add('hidden');endingCard.classList.add('hidden');resultCard.classList.remove('hidden');resultTitle.textContent='다시 일어섰다';resultText.textContent='이번 한 번은 넘겼다. 이제부터는 다시 0이 되면 끝이다.';document.getElementById('effects').textContent='';}
+function show(){if(s.ending)return;render();if(s.rescuePending){let stat=s.rescuePending[0];let label=s.rescuePending.map(k=>k==='money'?'돈':k==='mental'?'멘탈':'평판').join(' · ');let ev={id:'RESCUE_'+stat,type:'special',title:'한 번의 기회',text:`${label}이(가) 바닥났다.\n\n그래도 이번 한 번은 다시 일어설 수 있다.`};s.current=ev;meta.textContent='SPECIAL';title.textContent=ev.title;text.textContent=ev.text;choices.innerHTML='';eventCard.classList.remove('hidden');resultCard.classList.add('hidden');endingCard.classList.add('hidden');let b=document.createElement('button');b.className='choice';b.textContent='1. 다시 버틴다';b.onclick=()=>rescueNow(stat);choices.appendChild(b);return;}if(s.day>=MAX_DAY)return finish();let ev=pick();s.current=ev;meta.textContent=ev.type==='special'?'SPECIAL':(ev.type==='side'?'SIDE STORY':`DAY ${s.day}`);title.textContent=ev.title;text.textContent=ev.text;choices.innerHTML='';eventCard.classList.remove('hidden');resultCard.classList.add('hidden');endingCard.classList.add('hidden');
+ if(ev.choices){ev.choices.forEach((c,i)=>{if(c[4]==='reqMental4'&&s.mental<4)return;let b=document.createElement('button');b.className='choice';b.textContent=`${i+1}. ${c[0]}`;b.onclick=()=>choose(c);choices.appendChild(b);});}else{let b=document.createElement('button');b.className='choice';b.textContent='확인한다';b.onclick=()=>choose(['확인한다',ev.auto||{},'mental']);choices.appendChild(b);}}
+function choose(c){let ev=s.current;if(ev&&ev.id&&ev.id.startsWith('RESCUE_')){rescueNow(ev.id.slice(7));return;}let effects={...(c[1]||{})};let resultTitle='선택의 결과',resultText='';let special=null; s.eventCount++;if(c[2])s.traits[c[2]]++;if(c[3]==='helperDone'){s.flags.helped=true;s.story=null;s.flags.helper=true;s.flags.helperDone=true;s.storyCooldown=5;}if(c[3]==='hhAccept'){s.story='hh2';s.storyStage=0;s.storyCooldown=3;}if(c[3]==='hhClosed'){s.story=null;s.flags.hhClosed=true;s.flags.hhDone=true;s.storyCooldown=6;}if(c[3]==='lotto'){s.lottoBought=true;s.pending.push({at:s.eventCount+3,event:{id:'LOTTO_RESULT',type:'special',title:'로또 추첨일',text:'며칠 전 산 로또의 당첨 번호를 확인한다.',duration:1,auto:{}}});}if(c[3]==='invest'){s.investmentCount++;s.pending.push({at:s.eventCount+2,event:{id:'INV_RESULT',type:'special',title:'투자 결과',text:'며칠 전 투자한 결과를 확인한다.',duration:1,auto:{}}});resultTitle='투자를 했다';resultText='며칠 뒤 결과를 확인하기로 했다.';}
+ if(c[3]==='hobbyStart'){s.flags.hobbyStarted=true;s.story='hobby';s.storyStage=1;s.storyCooldown=3;}
+ if(ev.id==='VILLAIN'){s.story='villain_result';s.storyCooldown=3;}
+ if(ev.id==='HH2'){s.story='hh3';s.storyCooldown=2;}
+ if(ev.id==='HOB3'){s.story=null;s.flags.hobbyDone=true;s.storyCooldown=5;}
+ if(ev.id==='VILLAIN_RESULT'){s.story=null;s.flags.villainDone=true;}
+ if(ev.random){let o=randomOutcome(ev.random);effects={...effects,...o.effects};resultTitle=o.title;resultText=o.text;}
+ if(ev.auto){effects={...effects,...ev.auto};}
+ if(ev.after)ev.after(s);
+ if(ev.id==='INV_RESULT'){let r=Math.random();let o=r<.45?{title:'투자 성공',text:'며칠 기다린 끝에 확인해보니 수익이 났다.',effects:{money:1},success:true}:r<.70?{title:'박스권',text:'며칠 기다렸지만 크게 오르지도 내리지도 않았다.',effects:{}}:{title:'투자 손실',text:'기대했지만 이번에는 손실이 났다.',effects:{money:-1}};effects={...effects,...o.effects};resultTitle=o.title;resultText=o.text;if(o.success)s.investmentSuccess++;if(s.investmentSuccess>=3)special='investment';}
+ if(ev.id==='LOTTO_RESULT'){let r=Math.random();if(r<.005)special='lotto';else if(r<.055){effects.money=(effects.money||0)+1;resultTitle='본전';resultText='산 만큼은 돌려받았다.';}else{resultTitle='꽝';resultText='역시 쉽지 않다.';}}
+ if(ev.special==='headhunter'){special='headhunter';}
+ add(effects);
+ s.lastMoneyLoss=(effects.money||0)<0;
+ // day advances after event; random 1~5, but use event duration when present
+ s.day=Math.min(MAX_DAY,s.day+(ev.duration||3));s.counts[ev.id]=(s.counts[ev.id]||0)+1;s.recent.push(ev.id);if(s.recent.length>12)s.recent.shift();
+ if(s.mental===0||s.money===0||s.reputation===0){if(!s.rescueUsed){s.rescueUsed=true;s.rescuePending=['mental','money','reputation'].filter(k=>s[k]===0);}else{return finish('failure');}}
+ if(s.day>=MAX_DAY&&!special){showResult(resultTitle,resultText,effects);return;}
+ if(special){finish(special);return;}
+ showResult(resultTitle,resultText,effects);
+}
+function showResult(t,x,e){render();eventCard.classList.add('hidden');resultCard.classList.remove('hidden');resultTitle.textContent=t;resultText.textContent=x;effectsBox=effects;effects.innerHTML=effText(e);}
+let effectsBox={};
+function finish(kind){s.ending=true;render();eventCard.classList.add('hidden');resultCard.classList.add('hidden');endingCard.classList.remove('hidden');let titleText=endingFor(kind);endingMeta.textContent=kind==='failure'?'FAILURE':(kind==='lotto'||kind==='investment'||kind==='headhunter'?'SPECIAL ENDING':'FINAL ENDING');endingTitle.textContent=titleText[0];endingText.textContent=titleText[1];finalStats.innerHTML=`<div><small>돈</small><strong>${dots(s.money)}</strong></div><div><small>멘탈</small><strong>${dots(s.mental)}</strong></div><div><small>평판</small><strong>${dots(s.reputation)}</strong></div>`;let tr=getPlaystyle();trait.innerHTML=`<strong>${tr[0]}</strong>${tr[1]}`;}
+function endingFor(k){if(k==='failure')return['더는 못 버텨','돈도 챙겨야 하고,\n멘탈도 챙겨야 하고,\n회사에서의 평판도 신경 써야 한다.\n\n직장생활, 생각보다 쉽지 않다.'];if(k==='lotto')return['인생 역전','그냥 재미로 한 장 샀다.\n\n그런데 1등이었다.\n\n월요일 출근? 이제 진지하게 고민해봐야겠다.'];if(k==='investment')return['나 투자 천재인가?','처음엔 그냥 조금 넣어봤다.\n\n그런데 올랐다.\n한 번 더 넣었는데 또 올랐다.\n\n나 투자 천재인가?'];if(k==='headhunter')return['나를 알아보는 회사','면접 결과가 나왔다.\n\n합격했다.\n\n"이런 사람을 찾고 있었어요."\n\n역시, 알아보는 사람은 알아보는구나.'];let hi=v=>v>=4;let a=hi(s.money),b=hi(s.mental),c=hi(s.reputation);if(!a&&!b&&!c)return['오늘도 출근','돈도 많이 모으지 못했다.\n회사에서도 딱히 인정받지는 못했다.\n멘탈도 그럭저럭 버티는 정도다.\n\n그래도 월요일 아침은 온다.\n오늘도 출근한다.'];if(a&&!b&&!c)return['통장은 튼튼','회사는 여전히 힘들다.\n특별히 인정받는 것도 아니다.\n\n그래도 통장을 보면 조금 안심된다.\n퇴사하기엔 통장이 너무 튼튼하다.'];if(!a&&b&&!c)return['정신승리 만렙','돈은 많이 모으지 못했다.\n회사에서 크게 인정받지도 못했다.\n\n그런데 이상하게 멘탈은 멀쩡하다.\n이 정도면 나름 잘 살고 있는 거 아닐까?'];if(!a&&!b&&c)return['회사에 뼈를 묻음','돈도 많이 모으지 못했다.\n멘탈도 꽤 깎였다.\n\n그래도 회사에서는 인정받았다.\n이쯤 되면 그냥 여기서 뼈를 묻는 건가.'];if(a&&b&&!c)return['부업부터 해볼까','돈도 어느 정도 모았다.\n회사에서 받는 스트레스도 잘 관리했다.\n\n이제 회사 말고 다른 것도 해볼 수 있을 것 같다.\n일단 부업부터 해볼까?'];if(a&&!b&&c)return['회사에서는 인정받음','돈도 모았고 회사에서도 인정받았다.\n남들이 보기엔 꽤 괜찮은 직장생활이다.\n\n그런데 요즘은 출근하는 게 조금씩 힘들다.'];if(!a&&b&&c)return['다음 기회를 기다리며','돈은 아직 많이 모으지 못했다.\n그래도 회사에서 쌓은 것도 있고, 멘탈도 괜찮다.\n\n조금 더 준비해서 다음 기회를 기다려보기로 했다.'];return['퇴사는 선택, 출근은 취미','돈도 모았다.\n회사에서도 인정받았다.\n멘탈도 잘 챙겼다.\n\n이제는 퇴사해도 괜찮고, 계속 다녀도 괜찮다.\n\n퇴사는 선택, 출근은 취미.'];}
+function getPlaystyle(){let c=s.traits,m=Math.max(c.money,c.mental,c.reputation);let w=Object.entries(c).filter(([,v])=>v===m).map(([k])=>k);if(w.length!==1)return['균형형','돈, 멘탈, 평판을 어느 한쪽에만 치우치지 않고 선택했다.'];let map={money:['돈 우선형','기회가 보이면 돈을 챙기는 선택을 많이 했다.'],mental:['멘탈 우선형','무리하지 않고 내 상태를 먼저 챙기는 선택을 많이 했다.'],reputation:['평판 우선형','회사에서의 평판을 중요하게 생각하는 선택을 많이 했다.']};return map[w[0]];}
+next.onclick=()=>{s.rescueResult=false;show();};restart.onclick=()=>{s=fresh();show();};again.onclick=()=>{s=fresh();show();};share.onclick=async()=>{let t=getPlaystyle();let txt=`K-직장인 결과\n엔딩: ${endingTitle.textContent}\n돈 ${s.money}/5 · 멘탈 ${s.mental}/5 · 평판 ${s.reputation}/5\n플레이 성향: ${t[0]}`;try{if(navigator.share)await navigator.share({title:'K-직장인 결과',text:txt});else{await navigator.clipboard.writeText(txt);share.textContent='복사됐어요';}}catch(e){}};
+render();show();
+</script></body></html>
