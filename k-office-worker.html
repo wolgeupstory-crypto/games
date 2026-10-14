@@ -69,7 +69,7 @@ function fresh(){return {day:1,money:3,mental:3,reputation:3,rescueUsed:false,re
 let s=fresh();
 function clamp(v){return Math.max(0,Math.min(5,v));}
 function dots(v){return '●'.repeat(v)+'○'.repeat(5-v);}
-function render(){day.textContent=s.day>=MAX_DAY?'D-DAY':`D-${MAX_DAY-s.day}`;money.textContent=dots(s.money);mental.textContent=dots(s.mental);reputation.textContent=dots(s.reputation);}
+function render(){day.textContent=s.day>=MAX_DAY?'D-DAY':`D-${MAX_DAY-s.day+1}`;money.textContent=dots(s.money);mental.textContent=dots(s.mental);reputation.textContent=dots(s.reputation);}
 function effText(e){let n={money:'돈',mental:'멘탈',reputation:'평판'};return Object.entries(e||{}).filter(([,v])=>v).map(([k,v])=>`<span class="effect ${v>0?'good':'bad'}">${n[k]} ${v>0?'+':''}${v}</span>`).join(' · ')||'변화 없음';}
 function add(e){for(const[k,v]of Object.entries(e||{}))s[k]=clamp(s[k]+v);}
 function count(id){return s.counts[id]||0;}
@@ -112,37 +112,36 @@ function specialCandidate(){
 }
 function pool(){let base=order.filter(id=>{let e=E[id];if(!can(id)||count(id)>=e.max||!recentFresh(id))return false;if(id==='C17'&&!s.flags.helped)return false;if(id==='O17'&&s.lottoBought)return false;if(id==='O06'&&(s.flags.hobbyStarted||s.flags.hobbyDone||s.story==='hobby'))return false;return true;});if(s.lastMoneyLoss){let safe=base.filter(id=>!MONEY_LOSS_EVENTS.has(id));if(safe.length)base=safe;}return base;}
 function pick(){if(s.pending.length){let i=s.pending.findIndex(p=>s.eventCount>=p.at);if(i>=0){let p=s.pending.splice(i,1)[0];return p.event;}}
- if(s.story && s.storyCooldown>0){s.storyCooldown--;}
+ if(s.storyCooldown>0)s.storyCooldown--;
  if(s.story && s.storyCooldown<=0){
    if(s.story==='hobby'){let h=hobbyEvent();if(h)return h;s.story=null;s.flags.hobbyDone=true;s.storyCooldown=5;}
    return storyEvent();
  }
  let sp=s.story?null:specialCandidate();if(sp)return sp;
  let ids=pool();if(!ids.length)ids=order.filter(id=>count(id)<E[id].max&&can(id));
- // company/outside balance
  let last=s.recent.slice(-2);let companyRecent=last.filter(x=>E[x]?.type==='company').length;let outsideRecent=last.filter(x=>E[x]?.type==='outside').length;
  if(companyRecent>=2){let out=ids.filter(id=>E[id].type==='outside');if(out.length)ids=out;} else if(outsideRecent>=2){let co=ids.filter(id=>E[id].type==='company');if(co.length)ids=co;}
- // occasional investment/lotto result handled as pending; investment offered only when money >=3 and cooldown-like max 4
  if(s.day>=40&&s.money>=3&&s.investmentCount<4&&!s.story&&s.storyCooldown<=0&&Math.random()<.045){return {id:'INV',type:'special',title:'투자해볼까?',text:'요즘 주식이 계속 눈에 들어온다.\n조금 사볼까?',duration:2,choices:[['투자한다',{money:-1},'money','invest'],['하지 않는다',{},'money']]};}
  let id=ids[Math.floor(Math.random()*ids.length)];return E[id];}
-function rescueNow(stat){if(!s.rescuePending||!s.rescuePending.includes(stat))return;s[stat]=1;s.rescuePending=s.rescuePending.filter(k=>k!==stat);if(s.rescuePending.length){show();return;}s.rescueResult=true;s.current=null;eventCard.classList.add('hidden');endingCard.classList.add('hidden');resultCard.classList.remove('hidden');resultTitle.textContent='다시 일어섰다';resultText.textContent='이번 한 번은 넘겼다. 이제부터는 다시 0이 되면 끝이다.';document.getElementById('effects').textContent='';}
+function rescueNow(stat){if(!s.rescuePending||!s.rescuePending.includes(stat))return;s[stat]=1;s.rescuePending=s.rescuePending.filter(k=>k!==stat);if(s.rescuePending.length){show();return;}s.rescuePending=null;s.rescueResult=true;s.current=null;eventCard.classList.add('hidden');endingCard.classList.add('hidden');resultCard.classList.remove('hidden');resultTitle.textContent='다시 일어섰다';resultText.textContent='이번 한 번은 넘겼다. 이제부터는 다시 0이 되면 끝이다.';document.getElementById('effects').textContent='';}
 function show(){if(s.ending)return;render();if(s.rescuePending){let stat=s.rescuePending[0];let label=s.rescuePending.map(k=>k==='money'?'돈':k==='mental'?'멘탈':'평판').join(' · ');let ev={id:'RESCUE_'+stat,type:'special',title:'한 번의 기회',text:`${label}이(가) 바닥났다.\n\n그래도 이번 한 번은 다시 일어설 수 있다.`};s.current=ev;meta.textContent='SPECIAL';title.textContent=ev.title;text.textContent=ev.text;choices.innerHTML='';eventCard.classList.remove('hidden');resultCard.classList.add('hidden');endingCard.classList.add('hidden');let b=document.createElement('button');b.className='choice';b.textContent='1. 다시 버틴다';b.onclick=()=>rescueNow(stat);choices.appendChild(b);return;}if(s.day>=MAX_DAY)return finish();let ev=pick();s.current=ev;meta.textContent=ev.type==='special'?'SPECIAL':(ev.type==='side'?'SIDE STORY':`DAY ${s.day}`);title.textContent=ev.title;text.textContent=ev.text;choices.innerHTML='';eventCard.classList.remove('hidden');resultCard.classList.add('hidden');endingCard.classList.add('hidden');
- if(ev.choices){ev.choices.forEach((c,i)=>{if(c[4]==='reqMental4'&&s.mental<4)return;let b=document.createElement('button');b.className='choice';b.textContent=`${i+1}. ${c[0]}`;b.onclick=()=>choose(c);choices.appendChild(b);});}else{let b=document.createElement('button');b.className='choice';b.textContent='확인한다';b.onclick=()=>choose(['확인한다',ev.auto||{},'mental']);choices.appendChild(b);}}
+ if(ev.choices){ev.choices.forEach((c,i)=>{if(c[3]==='reqMental4'&&s.mental<4)return;let b=document.createElement('button');b.className='choice';b.textContent=`${i+1}. ${c[0]}`;b.onclick=()=>choose(c);choices.appendChild(b);});}else{let b=document.createElement('button');b.className='choice';b.textContent='확인한다';b.onclick=()=>choose(['확인한다',ev.auto||{},null]);choices.appendChild(b);}}
 function choose(c){let ev=s.current;if(ev&&ev.id&&ev.id.startsWith('RESCUE_')){rescueNow(ev.id.slice(7));return;}let effects={...(c[1]||{})};let resultTitle='선택의 결과',resultText='';let special=null; s.eventCount++;if(c[2])s.traits[c[2]]++;if(c[3]==='helperDone'){s.flags.helped=true;s.story=null;s.flags.helper=true;s.flags.helperDone=true;s.storyCooldown=5;}if(c[3]==='hhAccept'){s.story='hh2';s.storyStage=0;s.storyCooldown=3;}if(c[3]==='hhClosed'){s.story=null;s.flags.hhClosed=true;s.flags.hhDone=true;s.storyCooldown=6;}if(c[3]==='lotto'){s.lottoBought=true;s.pending.push({at:s.eventCount+3,event:{id:'LOTTO_RESULT',type:'special',title:'로또 추첨일',text:'며칠 전 산 로또의 당첨 번호를 확인한다.',duration:1,auto:{}}});}if(c[3]==='invest'){s.investmentCount++;s.pending.push({at:s.eventCount+2,event:{id:'INV_RESULT',type:'special',title:'투자 결과',text:'며칠 전 투자한 결과를 확인한다.',duration:1,auto:{}}});resultTitle='투자를 했다';resultText='며칠 뒤 결과를 확인하기로 했다.';}
  if(c[3]==='hobbyStart'){s.flags.hobbyStarted=true;s.story='hobby';s.storyStage=1;s.storyCooldown=3;}
- if(ev.id==='VILLAIN'){s.story='villain_result';s.storyCooldown=3;}
+ if(ev.id==='VILLAIN'){if(c[0]==='최대한 엮이지 않는다'){s.story=null;s.flags.villainDone=true;s.storyCooldown=5;}else{s.story='villain_result';s.storyCooldown=3;}}
  if(ev.id==='HH2'){s.story='hh3';s.storyCooldown=2;}
  if(ev.id==='HOB3'){s.story=null;s.flags.hobbyDone=true;s.storyCooldown=5;}
  if(ev.id==='VILLAIN_RESULT'){s.story=null;s.flags.villainDone=true;}
+ if(c[3]==='lunch'){let o=randomOutcome('lunch');effects={...effects,...o.effects};resultTitle=o.title;resultText=o.text;}
  if(ev.random){let o=randomOutcome(ev.random);effects={...effects,...o.effects};resultTitle=o.title;resultText=o.text;}
  if(ev.auto){effects={...effects,...ev.auto};}
  if(ev.after)ev.after(s);
- if(ev.id==='INV_RESULT'){let r=Math.random();let o=r<.45?{title:'투자 성공',text:'며칠 기다린 끝에 확인해보니 수익이 났다.',effects:{money:1},success:true}:r<.70?{title:'박스권',text:'며칠 기다렸지만 크게 오르지도 내리지도 않았다.',effects:{}}:{title:'투자 손실',text:'기대했지만 이번에는 손실이 났다.',effects:{money:-1}};effects={...effects,...o.effects};resultTitle=o.title;resultText=o.text;if(o.success)s.investmentSuccess++;if(s.investmentSuccess>=3)special='investment';}
+ if(ev.id==='INV_RESULT'){let r=Math.random();let o=r<.45?{title:'투자 성공',text:'며칠 기다린 끝에 확인해보니 수익이 났다.',effects:{money:2},success:true}:r<.70?{title:'박스권',text:'며칠 기다렸지만 크게 오르지도 내리지도 않았다. 투자금은 돌려받았다.',effects:{money:1}}:{title:'투자 손실',text:'기대했지만 이번에는 손실이 났다.',effects:{}};effects={...effects,...o.effects};resultTitle=o.title;resultText=o.text;if(o.success)s.investmentSuccess++;if(s.investmentSuccess>=3)special='investment';}
  if(ev.id==='LOTTO_RESULT'){let r=Math.random();if(r<.005)special='lotto';else if(r<.055){effects.money=(effects.money||0)+1;resultTitle='본전';resultText='산 만큼은 돌려받았다.';}else{resultTitle='꽝';resultText='역시 쉽지 않다.';}}
  if(ev.special==='headhunter'){special='headhunter';}
+ if(!resultText&&c[0]!=='확인한다')resultText=`'${c[0]}' 선택.`;
  add(effects);
  s.lastMoneyLoss=(effects.money||0)<0;
- // day advances after event; random 1~5, but use event duration when present
  s.day=Math.min(MAX_DAY,s.day+(ev.duration||3));s.counts[ev.id]=(s.counts[ev.id]||0)+1;s.recent.push(ev.id);if(s.recent.length>12)s.recent.shift();
  if(s.mental===0||s.money===0||s.reputation===0){if(!s.rescueUsed){s.rescueUsed=true;s.rescuePending=['mental','money','reputation'].filter(k=>s[k]===0);}else{return finish('failure');}}
  if(s.day>=MAX_DAY&&!special){showResult(resultTitle,resultText,effects);return;}
@@ -154,6 +153,9 @@ let effectsBox={};
 function finish(kind){s.ending=true;render();eventCard.classList.add('hidden');resultCard.classList.add('hidden');endingCard.classList.remove('hidden');let titleText=endingFor(kind);endingMeta.textContent=kind==='failure'?'FAILURE':(kind==='lotto'||kind==='investment'||kind==='headhunter'?'SPECIAL ENDING':'FINAL ENDING');endingTitle.textContent=titleText[0];endingText.textContent=titleText[1];finalStats.innerHTML=`<div><small>돈</small><strong>${dots(s.money)}</strong></div><div><small>멘탈</small><strong>${dots(s.mental)}</strong></div><div><small>평판</small><strong>${dots(s.reputation)}</strong></div>`;let tr=getPlaystyle();trait.innerHTML=`<strong>${tr[0]}</strong>${tr[1]}`;}
 function endingFor(k){if(k==='failure')return['더는 못 버텨','돈도 챙겨야 하고,\n멘탈도 챙겨야 하고,\n회사에서의 평판도 신경 써야 한다.\n\n직장생활, 생각보다 쉽지 않다.'];if(k==='lotto')return['인생 역전','그냥 재미로 한 장 샀다.\n\n그런데 1등이었다.\n\n월요일 출근? 이제 진지하게 고민해봐야겠다.'];if(k==='investment')return['나 투자 천재인가?','처음엔 그냥 조금 넣어봤다.\n\n그런데 올랐다.\n한 번 더 넣었는데 또 올랐다.\n\n나 투자 천재인가?'];if(k==='headhunter')return['나를 알아보는 회사','면접 결과가 나왔다.\n\n합격했다.\n\n"이런 사람을 찾고 있었어요."\n\n역시, 알아보는 사람은 알아보는구나.'];let hi=v=>v>=4;let a=hi(s.money),b=hi(s.mental),c=hi(s.reputation);if(!a&&!b&&!c)return['오늘도 출근','돈도 많이 모으지 못했다.\n회사에서도 딱히 인정받지는 못했다.\n멘탈도 그럭저럭 버티는 정도다.\n\n그래도 월요일 아침은 온다.\n오늘도 출근한다.'];if(a&&!b&&!c)return['통장은 튼튼','회사는 여전히 힘들다.\n특별히 인정받는 것도 아니다.\n\n그래도 통장을 보면 조금 안심된다.\n퇴사하기엔 통장이 너무 튼튼하다.'];if(!a&&b&&!c)return['정신승리 만렙','돈은 많이 모으지 못했다.\n회사에서 크게 인정받지도 못했다.\n\n그런데 이상하게 멘탈은 멀쩡하다.\n이 정도면 나름 잘 살고 있는 거 아닐까?'];if(!a&&!b&&c)return['회사에 뼈를 묻음','돈도 많이 모으지 못했다.\n멘탈도 꽤 깎였다.\n\n그래도 회사에서는 인정받았다.\n이쯤 되면 그냥 여기서 뼈를 묻는 건가.'];if(a&&b&&!c)return['부업부터 해볼까','돈도 어느 정도 모았다.\n회사에서 받는 스트레스도 잘 관리했다.\n\n이제 회사 말고 다른 것도 해볼 수 있을 것 같다.\n일단 부업부터 해볼까?'];if(a&&!b&&c)return['회사에서는 인정받음','돈도 모았고 회사에서도 인정받았다.\n남들이 보기엔 꽤 괜찮은 직장생활이다.\n\n그런데 요즘은 출근하는 게 조금씩 힘들다.'];if(!a&&b&&c)return['다음 기회를 기다리며','돈은 아직 많이 모으지 못했다.\n그래도 회사에서 쌓은 것도 있고, 멘탈도 괜찮다.\n\n조금 더 준비해서 다음 기회를 기다려보기로 했다.'];return['퇴사는 선택, 출근은 취미','돈도 모았다.\n회사에서도 인정받았다.\n멘탈도 잘 챙겼다.\n\n이제는 퇴사해도 괜찮고, 계속 다녀도 괜찮다.\n\n퇴사는 선택, 출근은 취미.'];}
 function getPlaystyle(){let c=s.traits,m=Math.max(c.money,c.mental,c.reputation);let w=Object.entries(c).filter(([,v])=>v===m).map(([k])=>k);if(w.length!==1)return['균형형','돈, 멘탈, 평판을 어느 한쪽에만 치우치지 않고 선택했다.'];let map={money:['돈 우선형','기회가 보이면 돈을 챙기는 선택을 많이 했다.'],mental:['멘탈 우선형','무리하지 않고 내 상태를 먼저 챙기는 선택을 많이 했다.'],reputation:['평판 우선형','회사에서의 평판을 중요하게 생각하는 선택을 많이 했다.']};return map[w[0]];}
-next.onclick=()=>{s.rescueResult=false;show();};restart.onclick=()=>{s=fresh();show();};again.onclick=()=>{s=fresh();show();};share.onclick=async()=>{let t=getPlaystyle();let txt=`K-직장인 결과\n엔딩: ${endingTitle.textContent}\n돈 ${s.money}/5 · 멘탈 ${s.mental}/5 · 평판 ${s.reputation}/5\n플레이 성향: ${t[0]}`;try{if(navigator.share)await navigator.share({title:'K-직장인 결과',text:txt});else{await navigator.clipboard.writeText(txt);share.textContent='복사됐어요';}}catch(e){}};
+next.onclick=()=>{s.rescueResult=false;show();};
+restart.onclick=()=>{s=fresh();share.textContent='결과 공유하기';show();};
+again.onclick=()=>{s=fresh();share.textContent='결과 공유하기';show();};
+share.onclick=async()=>{let t=getPlaystyle();let txt=`K-직장인 결과\n엔딩: ${endingTitle.textContent}\n돈 ${s.money}/5 · 멘탈 ${s.mental}/5 · 평판 ${s.reputation}/5\n플레이 성향: ${t[0]}`;try{if(navigator.share)await navigator.share({title:'K-직장인 결과',text:txt});else{await navigator.clipboard.writeText(txt);share.textContent='복사됐어요';}}catch(e){}};
 render();show();
 </script></body></html>
